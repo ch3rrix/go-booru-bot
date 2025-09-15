@@ -26,8 +26,9 @@ func displayImageInILQ(img Image, id string) gotgbot.InlineQueryResultPhoto {
 	if len(img.Description) > 80 {
 		description = fmt.Sprintf("Description: %s", img.Description[:80])
 	} else if len(img.Description) <= 80 && len(img.Description) > 0 {
-		description = fmt.Sprintf("Description: %s", img.Description)
+		description = fmt.Sprintf("Description: %s\n", img.Description)
 	}
+	description += fmt.Sprintf("Page: https://derpibooru.org/images/%s", strconv.Itoa(img.ID))
 	return gotgbot.InlineQueryResultPhoto{
 		Id:           id,
 		PhotoUrl:     img.Representations.Full,
@@ -68,7 +69,8 @@ func featured(b *gotgbot.Bot, ctx *ext.Context) error {
 	log.Printf("LOG: @%s entered /start", ctx.EffectiveUser.Username)
 	dbClient := NewDerpibooruClient()
 	response, dbErr := dbClient.getFeaturedImage()
-	caption := fmt.Sprintf("Description: %s\nTags: %s\nViewURL: %s\n", response.Image.Description, strings.Join(response.Image.Tags, ", "), response.Image.ViewURL)
+
+	caption := fmt.Sprintf("Description: %s\nTags: %s\nViewURL: %s\nPage URL: https://derpibooru.org/images/%s", response.Image.Description, strings.Join(response.Image.Tags, ", "), response.Image.ViewURL, strconv.Itoa(response.Image.ID))
 	if dbErr != nil {
 		log.Printf("ERROR: error while retreiving featured image: %v\n", dbErr)
 	}
