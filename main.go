@@ -39,6 +39,7 @@ func main() {
 
 	dispatcher.AddHandler(handlers.NewInlineQuery(inlinequery.All, inline))
 	dispatcher.AddHandler(handlers.NewCommand("featured", featured))
+	dispatcher.AddHandler(handlers.NewCommand("start", start))
 
 	err = updater.StartPolling(bot, &ext.PollingOpts{
 		DropPendingUpdates: true,

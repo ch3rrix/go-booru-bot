@@ -36,11 +36,39 @@ func displayImageInILQ(img Image, id string) gotgbot.InlineQueryResultPhoto {
 	}
 }
 
+func start(b *gotgbot.Bot, ctx *ext.Context) error {
+	log.Printf("LOG: @%s entered /start", ctx.EffectiveUser.Username)
+	/*	`
+	 *	*bold \*text*
+	 *	_italic \*text_
+	 *	__underline__
+	 *	~strikethrough~
+	 *	||spoiler||
+	 *	*bold _italic bold ~italic bold strikethrough ||italic bold strikethrough spoiler||~ __underline italic bold___ bold*
+	 *	[inline URL](http://www.example.com/)
+	 *	[inline mention of a user](tg://user?id=123456789)
+	 *	![👍](tg://emoji?id=5368324170671202286)
+	 *	`
+	 *	*/
+	startText := fmt.Sprint(`Hi\! This is a simple bot for searching and sending images from [derpibooru\.org](https://derpibooru.org)` +
+		"\nThis bot is made by @ch3rrix\n" +
+		"Commands:" +
+		"\n/start" + ` \- prints this message` +
+		"\n/featured" + ` \- sends today's featured image`)
+	_, err := b.SendMessage(ctx.EffectiveChat.Id, startText, &gotgbot.SendMessageOpts{
+		ParseMode:       "MarkdownV2",
+		ReplyParameters: &gotgbot.ReplyParameters{MessageId: ctx.EffectiveMessage.MessageId},
+	})
+	if err != nil {
+		return fmt.Errorf("ERROR: could not handle /start function: %v\n", err)
+	}
+	return nil
+}
 func featured(b *gotgbot.Bot, ctx *ext.Context) error {
-	log.Println("USER ENTERED /featured")
+	log.Printf("LOG: @%s entered /start", ctx.EffectiveUser.Username)
 	dbClient := NewDerpibooruClient()
 	response, dbErr := dbClient.getFeaturedImage()
-	caption := fmt.Sprintf("Description: %s\nTags: %s\nViewURL: %s", response.Image.Description, strings.Join(response.Image.Tags, ", "), response.Image.ViewURL)
+	caption := fmt.Sprintf("Description: %s\nTags: %s\nViewURL: %s\n", response.Image.Description, strings.Join(response.Image.Tags, ", "), response.Image.ViewURL)
 	if dbErr != nil {
 		log.Printf("ERROR: error while retreiving featured image: %v\n", dbErr)
 	}
@@ -48,7 +76,7 @@ func featured(b *gotgbot.Bot, ctx *ext.Context) error {
 		Caption: caption,
 	})
 	if err != nil {
-		return fmt.Errorf("ERROR: could not send image: %v", err)
+		return fmt.Errorf("ERROR: could not send image: %v\n", err)
 	}
 	return nil
 }
