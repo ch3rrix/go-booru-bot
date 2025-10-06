@@ -10,36 +10,54 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
+func trimDescription(description string) string {
+	if len(description) > 80 {
+		description = fmt.Sprintf("Description: %s", description[:80])
+	} else if len(description) <= 80 && len(description) > 0 {
+		description = fmt.Sprintf("Description: %s", description)
+	}
+	// '_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'
+	strings.ReplaceAll(description, `_`, `\_`)
+	strings.ReplaceAll(description, `*`, `\*`)
+	strings.ReplaceAll(description, `[`, `\[`)
+	strings.ReplaceAll(description, `]`, `\]`)
+	strings.ReplaceAll(description, `(`, `\(`)
+	strings.ReplaceAll(description, `)`, `\)`)
+	strings.ReplaceAll(description, `~`, `\~`)
+	strings.ReplaceAll(description, `>`, `\>`)
+	strings.ReplaceAll(description, `#`, `\#`)
+	strings.ReplaceAll(description, `-`, `\-`)
+	strings.ReplaceAll(description, `=`, `\=`)
+	strings.ReplaceAll(description, `|`, `\|`)
+	strings.ReplaceAll(description, `{`, `\{`)
+	strings.ReplaceAll(description, `}`, `\}`)
+	strings.ReplaceAll(description, `.`, `\.`)
+	strings.ReplaceAll(description, `!`, `\!`)
+
+	fmt.Printf("DEBUG: trimDescription: %s\n", description)
+
+	if !strings.HasSuffix(description, "\n") {
+		return description + "\n"
+	} else {
+		return description
+	}
+}
+
 func displayImageInILQ(img Image, id string) gotgbot.InlineQueryResultPhoto {
-	if img.Representations.Thumb == "" {
-		log.Printf("Thumbnail: https:%s\n", img.Representations.Thumb)
-	}
-
-	if img.Description != "" {
-		desc := strings.ReplaceAll(img.Description, "\n", " ")
-		if len(desc) > 100 {
-			desc = desc[:97] + "..."
-		}
-	}
-
-	var description string
-	if len(img.Description) > 80 {
-		description = fmt.Sprintf("Description: %s", img.Description[:80])
-	} else if len(img.Description) <= 80 && len(img.Description) > 0 {
-		description = fmt.Sprintf("Description: %s\n", img.Description)
-	}
-	description += fmt.Sprintf("Page: https://derpibooru.org/images/%s", strconv.Itoa(img.ID))
+	// description := trimDescription(img.Description)
+	description := fmt.Sprintf(`[Page URL](https://derpibooru.org/images/%s)`, strconv.Itoa(img.ID))
 	return gotgbot.InlineQueryResultPhoto{
 		Id:           id,
 		PhotoUrl:     img.Representations.Full,
 		ThumbnailUrl: img.Representations.Thumb,
 		Caption:      description,
+		ParseMode:    "MarkdownV2",
 	}
 }
 
 func start(b *gotgbot.Bot, ctx *ext.Context) error {
 	log.Printf("LOG: @%s entered /start", ctx.EffectiveUser.Username)
-	/*	`
+	/*	` This is just for reference
 	 *	*bold \*text*
 	 *	_italic \*text_
 	 *	__underline__
@@ -66,16 +84,23 @@ func start(b *gotgbot.Bot, ctx *ext.Context) error {
 	return nil
 }
 func featured(b *gotgbot.Bot, ctx *ext.Context) error {
-	log.Printf("LOG: @%s entered /start", ctx.EffectiveUser.Username)
+	log.Printf("LOG: @%s entered /featured", ctx.EffectiveUser.Username)
 	dbClient := NewDerpibooruClient()
 	response, dbErr := dbClient.getFeaturedImage()
+	// description := trimDescription(*&response.Image.Description)
 
-	caption := fmt.Sprintf("Description: %s\nTags: %s\nViewURL: %s\nPage URL: https://derpibooru.org/images/%s", response.Image.Description, strings.Join(response.Image.Tags, ", "), response.Image.ViewURL, strconv.Itoa(response.Image.ID))
+	caption := fmt.Sprintf(`[Page URL](https://derpibooru.org/images/%s)`,
+		//description,
+		strconv.Itoa(response.Image.ID),
+	)
+
 	if dbErr != nil {
 		log.Printf("ERROR: error while retreiving featured image: %v\n", dbErr)
 	}
 	_, err := b.SendPhoto(ctx.EffectiveChat.Id, gotgbot.InputFileByURL(response.Image.Representations.Full), &gotgbot.SendPhotoOpts{
-		Caption: caption,
+		Caption:    caption,
+		ParseMode:  "MarkdownV2",
+		HasSpoiler: response.Image.Spoilered,
 	})
 	if err != nil {
 		return fmt.Errorf("ERROR: could not send image: %v\n", err)
@@ -86,6 +111,7 @@ func inline(b *gotgbot.Bot, ctx *ext.Context) error {
 	dbClient := NewDerpibooruClient()
 	page := 1
 	query := ctx.InlineQuery.Query
+
 	if strings.Contains(query, "#") {
 		parts := strings.Split(query, "#")
 		if len(parts) == 2 {
@@ -95,6 +121,7 @@ func inline(b *gotgbot.Bot, ctx *ext.Context) error {
 			}
 		}
 	}
+
 	log.Printf("QUERY IS %s\n\n\n", query)
 	results, dbErr := dbClient.SearchImages(query, page, 25)
 	if dbErr != nil {
@@ -112,6 +139,7 @@ func inline(b *gotgbot.Bot, ctx *ext.Context) error {
 	_, err := ctx.InlineQuery.Answer(b, inlineResults, &gotgbot.AnswerInlineQueryOpts{
 		IsPersonal: true,
 	})
+
 	log.Printf("LOG (inline): %s", ctx.InlineQuery.Query)
 	if err != nil {
 		return fmt.Errorf("ERROR: failed to send Inline Query: %w", err)
