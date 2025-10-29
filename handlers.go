@@ -36,6 +36,10 @@ func start_handler(ctx context.Context, b *bot.Bot, update *models.Update) {
 	})
 }
 
+func mdParse(s string) string {
+	return bot.EscapeMarkdownUnescaped(bot.EscapeMarkdown(s))
+}
+
 func featured_handler(ctx context.Context, b *bot.Bot, update *models.Update) {
 	log.Printf("LOG: @%s entered /featured", update.Message.From.Username)
 	dbClient := NewDerpibooruClient()
@@ -93,15 +97,16 @@ func inline_handler(ctx context.Context, b *bot.Bot, update *models.Update) {
 		for _, image := range results.Images {
 			maxLen := 100
 			if len(image.Description) > maxLen {
-				image.Description = image.Description[:maxLen]
+				image.Description = fmt.Sprintf("%s...", image.Description[:maxLen])
 			}
 			log.Printf("\nhttps://derpibooru.org/images/%d\nDESCRIPTION: %s\n\n", image.ID, image.Description)
 			imageResults = append(imageResults, &models.InlineQueryResultPhoto{
 				ID:           strconv.Itoa(image.ID),
 				PhotoURL:     image.Representations.Full,
 				ThumbnailURL: image.Representations.Thumb,
-				Caption:      bot.EscapeMarkdownUnescaped(bot.EscapeMarkdown(fmt.Sprintf("%s...\n", image.Description+"..."))) + fmt.Sprintf("\n\n[View on Derpibooru](https://derpibooru.org/images/%d)", image.ID),
+				Caption:      mdParse(image.Description) + fmt.Sprintf("\n\n[View on Derpibooru](https://derpibooru.org/images/%d)", image.ID),
 				ParseMode:    models.ParseModeMarkdown,
+				Title:        query,
 			})
 			// DEBUG:
 			// log.Printf("DEBUG IMAGE URL: %v", image)
