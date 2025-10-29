@@ -48,7 +48,7 @@ func featured_handler(ctx context.Context, b *bot.Bot, update *models.Update) {
 		ChatID:     update.Message.Chat.ID,
 		Photo:      &models.InputFileString{Data: response.Image.Representations.Full},
 		HasSpoiler: response.Image.Spoilered,
-		Caption:    bot.EscapeMarkdown(response.Image.Description) + fmt.Sprintf("\n\n[View on Derpibooru](https://derpibooru.org/images/%s)", strconv.Itoa(response.Image.ID)) + fmt.Sprintf("\nTags: %s", strings.Join(response.Image.Tags[:5], ", ")),
+		Caption:    bot.EscapeMarkdown(response.Image.Description) + fmt.Sprintf("\n\n[View on Derpibooru](https://derpibooru.org/images/%d)", response.Image.ID) + fmt.Sprintf("\nTags: %s", strings.Join(response.Image.Tags[:5], ", ")),
 		ParseMode:  models.ParseModeMarkdown,
 	})
 	// _, err := b.SendPhoto(ctx.EffectiveChat.Id, gotgbot.InputFileByURL(response.Image.Representations.Full), &gotgbot.SendPhotoOpts{
@@ -59,16 +59,6 @@ func featured_handler(ctx context.Context, b *bot.Bot, update *models.Update) {
 	// if err != nil {
 	// 	return fmt.Errorf("ERROR: could not send image: %v\n", err)
 	// }
-}
-
-func displayImageInILQ(img Image, update *models.Update) *models.InlineQueryResultPhoto {
-	return &models.InlineQueryResultPhoto{
-		ID:           update.InlineQuery.ID,
-		PhotoURL:     img.Representations.Full,
-		ThumbnailURL: img.Representations.Thumb,
-		Caption:      img.Description,
-		ParseMode:    models.ParseModeMarkdown,
-	}
 }
 
 func inline_handler(ctx context.Context, b *bot.Bot, update *models.Update) {
@@ -93,29 +83,45 @@ func inline_handler(ctx context.Context, b *bot.Bot, update *models.Update) {
 	results, dbErr := dbClient.SearchImages(query, page, 25)
 	if dbErr != nil {
 		log.Printf("ERROR: error while searching images: %v\n", dbErr)
+		return
 	}
-	imageResults := make([]models.InlineQueryResultPhoto, 25)
+	var imageResults []*models.InlineQueryResultPhoto
 
 	if len(results.Images) == 0 {
 		log.Printf("LOG: no images found for query: %s\n", update.InlineQuery.Query)
 	} else {
-		for i, image := range results.Images {
-			// inlineResults = append(inlineResults, displayImageInILQ(i, update))
-			imageResults[i] = *displayImageInILQ(image, update)
+		for _, image := range results.Images {
+			maxLen := 100
+			if len(image.Description) > maxLen {
+				image.Description = image.Description[:maxLen]
+			}
+			log.Printf("\nhttps://derpibooru.org/images/%d\nDESCRIPTION: %s\n\n", image.ID, image.Description)
+			imageResults = append(imageResults, &models.InlineQueryResultPhoto{
+				ID:           strconv.Itoa(image.ID),
+				PhotoURL:     image.Representations.Full,
+				ThumbnailURL: image.Representations.Thumb,
+				Caption:      bot.EscapeMarkdownUnescaped(bot.EscapeMarkdown(fmt.Sprintf("%s...\n", image.Description+"..."))) + fmt.Sprintf("\n\n[View on Derpibooru](https://derpibooru.org/images/%d)", image.ID),
+				ParseMode:    models.ParseModeMarkdown,
+			})
+			// DEBUG:
+			// log.Printf("DEBUG IMAGE URL: %v", image)
 		}
 	}
 
-	inlineResults := make([]models.InlineQueryResult, len(imageResults))
-	for i, result := range imageResults {
-		inlineResults[i] = &result
+	var inlineResults []models.InlineQueryResult
+	for _, result := range imageResults {
+		inlineResults = append(inlineResults, result)
 	}
 
-	b.AnswerInlineQuery(ctx, &bot.AnswerInlineQueryParams{
-		InlineQueryID: update.InlineQuery.ID,
+	_, err := b.AnswerInlineQuery(ctx, &bot.AnswerInlineQueryParams{
+		InlineQueryID: update.InlineQuery.ID + bot.RandomString(10),
 		Results:       inlineResults,
-		IsPersonal:    true,
-		CacheTime:     10,
+		IsPersonal:    *bot.True(),
 	})
+	if err != nil {
+		log.Printf("\nANSWER INLINE QUERY ERROR: %v\n", err)
+		return
+	}
 
 	// _, err := update.InlineQuery.Answer(b, inlineResults, &bot.AnswerInlineQueryOpts{
 	// 	IsPersonal: true,
