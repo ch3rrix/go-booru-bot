@@ -1,8 +1,8 @@
 module go-booru-bot
 
-go 1.24.7
+go 1.24.9
 
 require (
-	github.com/PaulSonOfLars/gotgbot/v2 v2.0.0-rc.33
-	github.com/joho/godotenv v1.5.1
+	github.com/go-telegram/bot v1.17.0 // indirect
+	github.com/joho/godotenv v1.5.1 // indirect
 )

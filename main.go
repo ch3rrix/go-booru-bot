@@ -1,60 +1,54 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
-	"time"
+	"os/signal"
+	"strings"
 
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/inlinequery"
+	"github.com/go-telegram/bot"
+	"github.com/go-telegram/bot/models"
 	_ "github.com/joho/godotenv/autoload"
 )
 
 func main() {
-	token := os.Getenv("TG_BOT_TOKEN")
-	if token == "" {
-		log.Fatal("ERROR: could not get TG_BOT_TOKEN environment variable!")
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
+	opts := []bot.Option{
+		bot.WithDefaultHandler(inline_handler),
+		bot.WithErrorsHandler(func(err error) {
+			log.Printf("BOT HANDLER ERROR: %v", err)
+		}),
 	}
 
-	bot, err := gotgbot.NewBot(token, nil)
+	b, err := bot.New(os.Getenv("TG_BOT_TOKEN"), opts...)
 	if err != nil {
-		log.Fatalf("ERROR: could not create bot: %v\n", err)
+		log.Fatalf("BOT INIT ERROR: %v", err)
 	}
 
-	if !bot.SupportsInlineQueries {
-		log.Fatal("ERROR: bot does not support inline queries - enable them in botfather first!")
-	}
+	b.RegisterHandlerMatchFunc(func(update *models.Update) bool {
+		if update.Message == nil {
+			return false
+		}
+		for _, e := range update.Message.Entities {
+			if e.Type == models.MessageEntityTypeBotCommand {
+				cmd := update.Message.Text[e.Offset+1 : e.Offset+e.Length]
 
-	dispatcher := ext.NewDispatcher(&ext.DispatcherOpts{
-		Error: func(b *gotgbot.Bot, ctx *ext.Context, err error) ext.DispatcherAction {
-			log.Printf("ERROR: error happened while handling update: %v", err)
-			return ext.DispatcherActionNoop
-		},
-		MaxRoutines: ext.DefaultMaxRoutines,
-	})
+				if idx := strings.Index(cmd, "@"); idx != -1 {
+					cmd = cmd[:idx]
+				}
+				if cmd == "featured" {
+					return true
+				}
+			}
+		}
+		return false
+	}, featured_handler)
 
-	updater := ext.NewUpdater(dispatcher, nil)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "start", bot.MatchTypeCommand, start_handler)
+	b.RegisterHandlerMatchFunc(matchFunc, echo_handler)
 
-	dispatcher.AddHandler(handlers.NewInlineQuery(inlinequery.All, inline))
-	dispatcher.AddHandler(handlers.NewCommand("featured", featured))
-	dispatcher.AddHandler(handlers.NewCommand("start", start))
-
-	err = updater.StartPolling(bot, &ext.PollingOpts{
-		DropPendingUpdates: true,
-		GetUpdatesOpts: &gotgbot.GetUpdatesOpts{
-			Timeout:        9,
-			AllowedUpdates: []string{"inline_query", "message"},
-			RequestOpts: &gotgbot.RequestOpts{
-				Timeout: time.Second * 10,
-			},
-		},
-	})
-	if err != nil {
-		panic("PANIC: failed to start polling: " + err.Error())
-	}
-	log.Printf("LOG: %s has been started", bot.User.Username)
-
-	updater.Idle()
+	b.Start(ctx)
 }

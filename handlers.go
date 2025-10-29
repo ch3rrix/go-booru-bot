@@ -1,116 +1,83 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strconv"
 	"strings"
 
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/go-telegram/bot"
+	"github.com/go-telegram/bot/models"
 )
 
-func trimDescription(description string) string {
-	if len(description) > 80 {
-		description = fmt.Sprintf("Description: %s", description[:80])
-	} else if len(description) <= 80 && len(description) > 0 {
-		description = fmt.Sprintf("Description: %s", description)
-	}
-	// '_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'
-	strings.ReplaceAll(description, `_`, `\_`)
-	strings.ReplaceAll(description, `*`, `\*`)
-	strings.ReplaceAll(description, `[`, `\[`)
-	strings.ReplaceAll(description, `]`, `\]`)
-	strings.ReplaceAll(description, `(`, `\(`)
-	strings.ReplaceAll(description, `)`, `\)`)
-	strings.ReplaceAll(description, `~`, `\~`)
-	strings.ReplaceAll(description, `>`, `\>`)
-	strings.ReplaceAll(description, `#`, `\#`)
-	strings.ReplaceAll(description, `-`, `\-`)
-	strings.ReplaceAll(description, `=`, `\=`)
-	strings.ReplaceAll(description, `|`, `\|`)
-	strings.ReplaceAll(description, `{`, `\{`)
-	strings.ReplaceAll(description, `}`, `\}`)
-	strings.ReplaceAll(description, `.`, `\.`)
-	strings.ReplaceAll(description, `!`, `\!`)
-
-	fmt.Printf("DEBUG: trimDescription: %s\n", description)
-
-	if !strings.HasSuffix(description, "\n") {
-		return description + "\n"
-	} else {
-		return description
-	}
-}
-
-func displayImageInILQ(img Image, id string) gotgbot.InlineQueryResultPhoto {
-	// description := trimDescription(img.Description)
-	description := fmt.Sprintf(`[Page URL](https://derpibooru.org/images/%s)`, strconv.Itoa(img.ID))
-	return gotgbot.InlineQueryResultPhoto{
-		Id:           id,
-		PhotoUrl:     img.Representations.Full,
-		ThumbnailUrl: img.Representations.Thumb,
-		Caption:      description,
-		ParseMode:    "MarkdownV2",
-	}
-}
-
-func start(b *gotgbot.Bot, ctx *ext.Context) error {
-	log.Printf("LOG: @%s entered /start", ctx.EffectiveUser.Username)
-	/*	` This is just for reference
-	 *	*bold \*text*
-	 *	_italic \*text_
-	 *	__underline__
-	 *	~strikethrough~
-	 *	||spoiler||
-	 *	*bold _italic bold ~italic bold strikethrough ||italic bold strikethrough spoiler||~ __underline italic bold___ bold*
-	 *	[inline URL](http://www.example.com/)
-	 *	[inline mention of a user](tg://user?id=123456789)
-	 *	![👍](tg://emoji?id=5368324170671202286)
-	 *	`
-	 *	*/
-	startText := fmt.Sprint(`Hi\! This is a simple bot for searching and sending images from [derpibooru\.org](https://derpibooru.org)` +
-		"\nThis bot is made by @ch3rrix\n" +
-		"Commands:" +
-		"\n/start" + ` \- prints this message` +
-		"\n/featured" + ` \- sends today's featured image`)
-	_, err := b.SendMessage(ctx.EffectiveChat.Id, startText, &gotgbot.SendMessageOpts{
-		ParseMode:       "MarkdownV2",
-		ReplyParameters: &gotgbot.ReplyParameters{MessageId: ctx.EffectiveMessage.MessageId},
+func echo_handler(ctx context.Context, b *bot.Bot, update *models.Update) {
+	b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:    update.Message.Chat.ID,
+		Text:      update.Message.Text,
+		ParseMode: models.ParseModeMarkdown,
 	})
-	if err != nil {
-		return fmt.Errorf("ERROR: could not handle /start function: %v\n", err)
-	}
-	return nil
 }
-func featured(b *gotgbot.Bot, ctx *ext.Context) error {
-	log.Printf("LOG: @%s entered /featured", ctx.EffectiveUser.Username)
+
+func matchFunc(update *models.Update) bool {
+	if update.Message == nil {
+		return false
+	}
+
+	return update.Message.Text == "hello"
+}
+
+func start_handler(ctx context.Context, b *bot.Bot, update *models.Update) {
+	b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: update.Message.Chat.ID,
+		Text: bot.EscapeMarkdown(fmt.Sprintf(`Hello, %s\!`,
+			update.Message.From.FirstName)),
+		ParseMode: models.ParseModeMarkdown,
+	})
+}
+
+func featured_handler(ctx context.Context, b *bot.Bot, update *models.Update) {
+	log.Printf("LOG: @%s entered /featured", update.Message.From.Username)
 	dbClient := NewDerpibooruClient()
 	response, dbErr := dbClient.getFeaturedImage()
-	// description := trimDescription(*&response.Image.Description)
-
-	caption := fmt.Sprintf(`[Page URL](https://derpibooru.org/images/%s)`,
-		//description,
-		strconv.Itoa(response.Image.ID),
-	)
 
 	if dbErr != nil {
 		log.Printf("ERROR: error while retreiving featured image: %v\n", dbErr)
 	}
-	_, err := b.SendPhoto(ctx.EffectiveChat.Id, gotgbot.InputFileByURL(response.Image.Representations.Full), &gotgbot.SendPhotoOpts{
-		Caption:    caption,
-		ParseMode:  "MarkdownV2",
+	b.SendPhoto(ctx, &bot.SendPhotoParams{
+		ChatID:     update.Message.Chat.ID,
+		Photo:      &models.InputFileString{Data: response.Image.Representations.Full},
 		HasSpoiler: response.Image.Spoilered,
+		Caption:    bot.EscapeMarkdown(response.Image.Description) + fmt.Sprintf("\n\n[View on Derpibooru](https://derpibooru.org/images/%s)", strconv.Itoa(response.Image.ID)) + fmt.Sprintf("\nTags: %s", strings.Join(response.Image.Tags[:5], ", ")),
+		ParseMode:  models.ParseModeMarkdown,
 	})
-	if err != nil {
-		return fmt.Errorf("ERROR: could not send image: %v\n", err)
-	}
-	return nil
+	// _, err := b.SendPhoto(ctx.EffectiveChat.Id, gotgbot.InputFileByURL(response.Image.Representations.Full), &gotgbot.SendPhotoOpts{
+	// 	Caption: caption,
+	// 	// ParseMode:  "MarkdownV2",
+	// 	HasSpoiler: response.Image.Spoilered,
+	// })
+	// if err != nil {
+	// 	return fmt.Errorf("ERROR: could not send image: %v\n", err)
+	// }
 }
-func inline(b *gotgbot.Bot, ctx *ext.Context) error {
+
+func displayImageInILQ(img Image, update *models.Update) *models.InlineQueryResultPhoto {
+	return &models.InlineQueryResultPhoto{
+		ID:           update.InlineQuery.ID,
+		PhotoURL:     img.Representations.Full,
+		ThumbnailURL: img.Representations.Thumb,
+		Caption:      img.Description,
+		ParseMode:    models.ParseModeMarkdown,
+	}
+}
+
+func inline_handler(ctx context.Context, b *bot.Bot, update *models.Update) {
+	if update.InlineQuery == nil {
+		return
+	}
 	dbClient := NewDerpibooruClient()
 	page := 1
-	query := ctx.InlineQuery.Query
+	query := update.InlineQuery.Query
 
 	if strings.Contains(query, "#") {
 		parts := strings.Split(query, "#")
@@ -127,23 +94,35 @@ func inline(b *gotgbot.Bot, ctx *ext.Context) error {
 	if dbErr != nil {
 		log.Printf("ERROR: error while searching images: %v\n", dbErr)
 	}
-	var inlineResults []gotgbot.InlineQueryResult
+	imageResults := make([]models.InlineQueryResultPhoto, 25)
+
 	if len(results.Images) == 0 {
-		log.Printf("LOG: no images found for query: %s\n", ctx.InlineQuery.Query)
+		log.Printf("LOG: no images found for query: %s\n", update.InlineQuery.Query)
 	} else {
 		for i, image := range results.Images {
-			inlineResults = append(inlineResults, displayImageInILQ(image, fmt.Sprintf("imline-query-string-id-%s", strconv.Itoa(i))))
+			// inlineResults = append(inlineResults, displayImageInILQ(i, update))
+			imageResults[i] = *displayImageInILQ(image, update)
 		}
 	}
 
-	_, err := ctx.InlineQuery.Answer(b, inlineResults, &gotgbot.AnswerInlineQueryOpts{
-		IsPersonal: true,
-	})
-
-	log.Printf("LOG (inline): %s", ctx.InlineQuery.Query)
-	if err != nil {
-		return fmt.Errorf("ERROR: failed to send Inline Query: %w", err)
+	inlineResults := make([]models.InlineQueryResult, len(imageResults))
+	for i, result := range imageResults {
+		inlineResults[i] = &result
 	}
 
-	return nil
+	b.AnswerInlineQuery(ctx, &bot.AnswerInlineQueryParams{
+		InlineQueryID: update.InlineQuery.ID,
+		Results:       inlineResults,
+		IsPersonal:    true,
+		CacheTime:     10,
+	})
+
+	// _, err := update.InlineQuery.Answer(b, inlineResults, &bot.AnswerInlineQueryOpts{
+	// 	IsPersonal: true,
+	// })
+
+	// log.Printf("LOG (inline): %s", ctx.InlineQuery.Query)
+	// if err != nil {
+	// 	return fmt.Errorf("ERROR: failed to send Inline Query: %w", err)
+	// }
 }
