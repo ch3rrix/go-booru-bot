@@ -69,10 +69,6 @@ type Image struct {
 	OrigSize int `json:"orig_size"`
 }
 
-func whatAmIDoingWrong() {
-	log.Printf("\n===========\nBRUH\n===========\n")
-}
-
 type SearchResponse struct {
 	Images []Image `json:"images"`
 	Total  int     `json:"total"`
@@ -96,7 +92,6 @@ func NewDerpibooruClient() *DerpibooruClient {
 func (dbClient *DerpibooruClient) SearchImages(query string, page int, perPage int) (*SearchResponse, error) {
 	u, err := url.Parse(dbClient.BaseURL + "/search")
 	if err != nil {
-		whatAmIDoingWrong()
 		return nil, fmt.Errorf("ERROR (client.SearchImages): failed to parse URL: %v", err)
 	}
 
@@ -108,9 +103,7 @@ func (dbClient *DerpibooruClient) SearchImages(query string, page int, perPage i
 	u.RawQuery = params.Encode()
 
 	request, err := http.NewRequest("GET", u.String(), nil)
-	// fmt.Printf("DEBUG: REQUEST: %v\n\n", request)
 	if err != nil {
-		whatAmIDoingWrong()
 		return nil, fmt.Errorf("failed to create request: %v", err)
 	}
 
@@ -119,11 +112,9 @@ func (dbClient *DerpibooruClient) SearchImages(query string, page int, perPage i
 
 	response, err := dbClient.Client.Do(request)
 	if err != nil {
-		whatAmIDoingWrong()
 		return nil, fmt.Errorf("failed to make request: %v", err)
 	}
 	defer response.Body.Close()
-	// fmt.Printf("DEBUG: RESPONSE: %v\n\n", response)
 
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("API returned status code: %d", response.StatusCode)
@@ -132,11 +123,8 @@ func (dbClient *DerpibooruClient) SearchImages(query string, page int, perPage i
 	// Parse the JSON response
 	var searchResponse SearchResponse
 	if err := json.NewDecoder(response.Body).Decode(&searchResponse); err != nil {
-		whatAmIDoingWrong()
 		return nil, fmt.Errorf("failed to decode response: %v", err)
 	}
-
-	// fmt.Printf("DEBUG: SEARCH RESP: %v\n\n", searchResponse)
 
 	return &searchResponse, nil
 }
@@ -144,7 +132,6 @@ func (dbClient *DerpibooruClient) SearchImages(query string, page int, perPage i
 func (c *DerpibooruClient) getFeaturedImage() (*FeaturedResponse, error) {
 	u, err := url.Parse(c.BaseURL + "/images/featured")
 	if err != nil {
-		whatAmIDoingWrong()
 		return nil, fmt.Errorf("failed to parse URL: %v", err)
 	}
 	params := url.Values{}
@@ -153,7 +140,6 @@ func (c *DerpibooruClient) getFeaturedImage() (*FeaturedResponse, error) {
 
 	request, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
-		whatAmIDoingWrong()
 		return nil, fmt.Errorf("ERROR: failed to create request: %v", err)
 	}
 	// request.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:143.0) Gecko/20100101 Firefox/143.0")
@@ -161,10 +147,8 @@ func (c *DerpibooruClient) getFeaturedImage() (*FeaturedResponse, error) {
 
 	response, err := c.Client.Do(request)
 	if err != nil {
-		whatAmIDoingWrong()
 		return nil, fmt.Errorf("ERROR: failed to make request: %v", err)
 	}
-	log.Printf("DEBUG: RESPONSE: %v\n\n", response)
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
@@ -173,7 +157,6 @@ func (c *DerpibooruClient) getFeaturedImage() (*FeaturedResponse, error) {
 
 	var featuredResponse FeaturedResponse
 	if err := json.NewDecoder(response.Body).Decode(&featuredResponse); err != nil {
-		whatAmIDoingWrong()
 		return nil, fmt.Errorf("ERROR: failed to decode response: %v", err)
 	}
 	return &featuredResponse, nil
