@@ -70,7 +70,7 @@ func inline_handler(ctx context.Context, b *bot.Bot, update *models.Update) {
 
 }
 func process_inline_query(ctx context.Context, b *bot.Bot, update *models.Update, query string) {
-	page := 0
+	page := 1
 	if update.InlineQuery.Offset != "" {
 		page, _ = strconv.Atoi(update.InlineQuery.Offset)
 	}
