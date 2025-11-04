@@ -19,13 +19,13 @@ func main() {
 	opts := []bot.Option{
 		bot.WithDefaultHandler(inline_handler),
 		bot.WithErrorsHandler(func(err error) {
-			log.Printf("BOT HANDLER ERROR: %v", err)
+			log.Printf("\nBOT HANDLER ERROR: %v\n----------\n", err)
 		}),
 	}
 
 	b, err := bot.New(os.Getenv("TG_BOT_TOKEN"), opts...)
 	if err != nil {
-		log.Fatalf("BOT INIT ERROR: %v", err)
+		log.Fatalf("\nBOT INIT ERROR: %v\n----------\n", err)
 	}
 
 	b.RegisterHandlerMatchFunc(func(update *models.Update) bool {
