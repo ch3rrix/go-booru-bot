@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -110,14 +111,14 @@ func (c *E621Client) SearchPosts(tags []string, limit int, page int) (*PostsResp
 	params := url.Values{}
 
 	if len(tags) > 0 {
-		tagsQuery := ""
+		tagsQuery := strings.Builder{}
 		for i, tag := range tags {
 			if i > 0 {
-				tagsQuery += " "
+				tagsQuery.WriteByte(' ')
 			}
-			tagsQuery += tag
+			tagsQuery.WriteString(tag)
 		}
-		params.Add("tags", tagsQuery)
+		params.Add("tags", tagsQuery.String())
 	}
 
 	if limit > 0 {
